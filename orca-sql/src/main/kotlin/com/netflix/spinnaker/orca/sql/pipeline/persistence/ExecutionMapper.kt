@@ -22,6 +22,8 @@ import com.netflix.spinnaker.orca.api.pipeline.models.StageExecution
 import java.sql.ResultSet
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
+import java.nio.charset.StandardCharsets
+import java.util.zip.GZIPInputStream
 
 /**
  * Converts a SQL [ResultSet] into an Execution.
@@ -36,13 +38,28 @@ class ExecutionMapper(
 
   private val log = LoggerFactory.getLogger(javaClass)
 
+  fun conditionallyDecompressBody(
+    body: String,
+    compressedBody: ByteArray?
+  ): String {
+    return if (compressedBody == null) {
+      body
+    } else {
+      GZIPInputStream(compressedBody.inputStream())
+        .bufferedReader(StandardCharsets.UTF_8)
+        .use { it.readText() }
+    }
+  }
+
   fun map(rs: ResultSet, context: DSLContext): Collection<PipelineExecution> {
     val results = mutableListOf<PipelineExecution>()
     val executionMap = mutableMapOf<String, PipelineExecution>()
     val legacyMap = mutableMapOf<String, String>()
 
     while (rs.next()) {
-      mapper.readValue<PipelineExecution>(rs.getString("body"))
+      mapper.readValue<PipelineExecution>(
+          conditionallyDecompressBody(rs.getString("body"), rs.getBytes("compressed_body"))
+      )
         .also {
           execution -> results.add(execution)
           execution.partition = rs.getString("`partition`")
@@ -89,7 +106,9 @@ class ExecutionMapper(
     executions.getValue(executionId)
       .stages
       .add(
-        mapper.readValue<StageExecution>(rs.getString("body"))
+        mapper.readValue<StageExecution>(
+            conditionallyDecompressBody(rs.getString("body"), rs.getBytes("compressed_body"))
+          )
           .apply {
             execution = executions.getValue(executionId)
           }

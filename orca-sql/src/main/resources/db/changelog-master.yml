@@ -53,3 +53,6 @@ databaseChangeLog:
 - include:
     file: changelog/20200603-deleted-executions-table-not-mysql.yml
     relativeToChangelogFile: true
+- include:
+    file: changelog/20201211-add-compressed_body-column.yaml
+    relativeToChangelogFile: true

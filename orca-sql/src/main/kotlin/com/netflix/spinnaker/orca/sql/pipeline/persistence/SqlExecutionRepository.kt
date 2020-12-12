@@ -72,6 +72,9 @@ import org.jooq.impl.DSL.timestampSub
 import org.jooq.impl.DSL.value
 import org.slf4j.LoggerFactory
 import rx.Observable
+import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
+import java.util.zip.GZIPOutputStream
 
 /**
  * A generic SQL [ExecutionRepository].
@@ -87,7 +90,9 @@ class SqlExecutionRepository(
   private val batchReadSize: Int = 10,
   private val stageReadSize: Int = 200,
   private val poolName: String = "default",
-  private val interlink: Interlink? = null
+  private val interlink: Interlink? = null,
+  private val enableBodyCompression: Boolean = false,
+  private val bodyCompressionThreshold: Int = 1024
 ) : ExecutionRepository, ExecutionStatisticsRepository {
   companion object {
     val ulid = SpinULID(SecureRandom())
@@ -734,6 +739,46 @@ class SqlExecutionRepository(
     }
   }
 
+  /***
+   * Conditionally compresses the provided body string if the body length exceeds the threshold
+   *
+   * @param body: body string to be compressed
+   *
+   * @return a Pair of uncompressed body string and compressed body byte array
+   */
+  fun conditionallyCompressBody(body: String): Pair<String, ByteArray?> {
+
+    var uncompressedBody = body
+    var compressedBody: ByteArray? = null
+
+    if (body.length <= bodyCompressionThreshold) {
+      log.debug("Body length ${body.length} does not breach " +
+        "the compression threshold $bodyCompressionThreshold. No need to compress.")
+    } else {
+      log.warn("Body length ${body.length} breaches the compression threshold " +
+        "$bodyCompressionThreshold.")
+      if (enableBodyCompression) {
+        log.info("Performing large body compression.")
+        val compressedBodyByteStream = ByteArrayOutputStream()
+  val zipBeginTS = System.currentTimeMillis();
+        GZIPOutputStream(compressedBodyByteStream).bufferedWriter(StandardCharsets.UTF_8).use {
+          it.write(body, 0, body.length)
+        }
+        // Set uncompressed body to empty string since body is not a nullable column
+        uncompressedBody = ""
+        compressedBody = compressedBodyByteStream.toByteArray()
+  val zipEndTS = System.currentTimeMillis();
+        log.info("Compression complete. Uncompressed body length: ${body.length} " +
+          "Compressed body length: ${compressedBody.size} " +
+    "Compression ratio: ${body.length.toDouble()/compressedBody.size} " +
+    "Compression time(ms): ${zipEndTS - zipBeginTS} ")
+      } else {
+        log.warn("Large body compression has been disabled. Not compressing the body.")
+      }
+    }
+    return Pair(uncompressedBody, compressedBody)
+  }
+
   private fun storeExecutionInternal(ctx: DSLContext, execution: PipelineExecution, storeStages: Boolean = false) {
     validateHandledPartitionOrThrow(execution)
 
@@ -744,7 +789,8 @@ class SqlExecutionRepository(
       val tableName = execution.type.tableName
       val stageTableName = execution.type.stagesTableName
       val status = execution.status.toString()
-      val body = mapper.writeValueAsString(execution)
+      log.info("Conditionally compressing the pipeline execution body for id: ${execution.id}")
+      val (body, compressedBody) = conditionallyCompressBody(mapper.writeValueAsString(execution))
 
       val (executionId, legacyId) = mapLegacyId(ctx, tableName, execution.id, execution.startTime)
 
@@ -758,12 +804,14 @@ class SqlExecutionRepository(
         field("start_time") to execution.startTime,
         field("canceled") to execution.isCanceled,
         field("updated_at") to currentTimeMillis(),
-        field("body") to body
+        field("body") to body,
+        field("compressed_body") to compressedBody
       )
 
       val updatePairs = mapOf(
         field("status") to status,
         field("body") to body,
+        field("compressed_body") to compressedBody,
         field(name("partition")) to partitionName,
         // won't have started on insert
         field("start_time") to execution.startTime,
@@ -817,7 +865,7 @@ class SqlExecutionRepository(
   private fun storeStageInternal(ctx: DSLContext, stage: StageExecution, executionId: String? = null) {
     val stageTable = stage.execution.type.stagesTableName
     val table = stage.execution.type.tableName
-    val body = mapper.writeValueAsString(stage)
+    val (body, compressedBody) = conditionallyCompressBody(mapper.writeValueAsString(stage))
     val buildTime = stage.execution.buildTime
 
     val executionUlid = executionId ?: mapLegacyId(ctx, table, stage.execution.id, buildTime).first
@@ -829,13 +877,15 @@ class SqlExecutionRepository(
       field("execution_id") to executionUlid,
       field("status") to stage.status.toString(),
       field("updated_at") to currentTimeMillis(),
-      field("body") to body
+      field("body") to body,
+      field("compressed_body") to compressedBody
     )
 
     val updatePairs = mapOf(
       field("status") to stage.status.toString(),
       field("updated_at") to currentTimeMillis(),
-      field("body") to body
+      field("body") to body,
+      field("compressed_body") to compressedBody
     )
 
     upsert(ctx, stageTable, insertPairs, updatePairs, stage.id)
@@ -999,7 +1049,7 @@ class SqlExecutionRepository(
       .from(type.tableName)
 
   private fun selectFields() =
-    listOf(field("id"), field("body"), field("`partition`"))
+    listOf(field("id"), field("body"), field("compressed_body"), field("`partition`"))
 
   private fun SelectForUpdateStep<out Record>.fetchExecutions() =
     ExecutionMapper(mapper, stageReadSize).map(fetch().intoResultSet(), jooq)

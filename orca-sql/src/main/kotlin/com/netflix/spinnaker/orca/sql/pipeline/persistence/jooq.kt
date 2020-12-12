@@ -85,7 +85,7 @@ internal val ExecutionType.stagesTableName: Table<Record>
  * Selects all stages for an [executionType] and List [executionIds].
  */
 internal fun DSLContext.selectExecutionStages(executionType: ExecutionType, executionIds: Collection<String>) =
-  select(field("execution_id"), field("body"))
+  select(field("execution_id"), field("body"), field("compressed_body"))
     .from(executionType.stagesTableName)
     .where(field("execution_id").`in`(*executionIds.toTypedArray()))
     .fetch()

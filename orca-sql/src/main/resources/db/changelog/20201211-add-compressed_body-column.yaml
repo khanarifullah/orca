@@ -1,0 +1,42 @@
+databaseChangeLog:
+- changeSet:
+    id: add-compressed_body-column
+    author: apattan
+    changes:
+    - addColumn:
+        tableName: pipelines
+        columns:
+        - column:
+            name: compressed_body
+            type: blob
+    - addColumn:
+        tableName: pipeline_stages
+        columns:
+        - column:
+            name: compressed_body
+            type: blob
+    - addColumn:
+        tableName: orchestrations
+        columns:
+        - column:
+            name: compressed_body
+            type: blob
+    - addColumn:
+        tableName: orchestration_stages
+        columns:
+        - column:
+            name: compressed_body
+            type: blob
+    rollback:
+    - dropColumn:
+        tableName: pipelines
+        columnName: compressed_body
+    - dropColumn:
+        tableName: pipeline_stages
+        columnName: compressed_body
+    - dropColumn:
+        tableName: orchestrations
+        columnName: compressed_body
+    - dropColumn:
+        tableName: orchestration_stages
+        columnName: compressed_body

@@ -71,7 +71,9 @@ class SqlConfiguration {
       properties.retries.transactions,
       orcaSqlProperties.batchReadSize,
       orcaSqlProperties.stageReadSize,
-      interlink = interlink.orElse(null)
+      interlink = interlink.orElse(null),
+      enableBodyCompression = orcaSqlProperties.enableBodyCompression,
+      bodyCompressionThreshold = orcaSqlProperties.bodyCompressionThreshold
     ).let {
       InstrumentedProxy.proxy(registry, it, "sql.executions", mapOf(Pair("repository", "primary"))) as ExecutionRepository
     }
@@ -93,7 +95,9 @@ class SqlConfiguration {
       properties.retries.transactions,
       orcaSqlProperties.batchReadSize,
       orcaSqlProperties.stageReadSize,
-      poolName
+      poolName,
+      enableBodyCompression = orcaSqlProperties.enableBodyCompression,
+      bodyCompressionThreshold = orcaSqlProperties.bodyCompressionThreshold
     ).let {
       InstrumentedProxy.proxy(registry, it, "sql.executions", mapOf(Pair("repository", "secondary"))) as ExecutionRepository
     }
