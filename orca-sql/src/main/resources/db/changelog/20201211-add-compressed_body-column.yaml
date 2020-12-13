@@ -8,25 +8,25 @@ databaseChangeLog:
         columns:
         - column:
             name: compressed_body
-            type: blob
+            type: longblob
     - addColumn:
         tableName: pipeline_stages
         columns:
         - column:
             name: compressed_body
-            type: blob
+            type: longblob
     - addColumn:
         tableName: orchestrations
         columns:
         - column:
             name: compressed_body
-            type: blob
+            type: longblob
     - addColumn:
         tableName: orchestration_stages
         columns:
         - column:
             name: compressed_body
-            type: blob
+            type: longblob
     rollback:
     - dropColumn:
         tableName: pipelines
