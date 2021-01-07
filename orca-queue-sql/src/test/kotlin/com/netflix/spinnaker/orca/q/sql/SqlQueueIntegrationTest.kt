@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.netflix.spectator.api.Registry
+import com.netflix.spinnaker.config.ExecutionCompressionProperties
 import com.netflix.spinnaker.config.ObjectMapperSubtypeProperties
 import com.netflix.spinnaker.config.OrcaSqlProperties
 import com.netflix.spinnaker.config.SpringObjectMapperConfigurer
@@ -120,7 +121,8 @@ class SqlTestConfig {
     mapper: ObjectMapper,
     registry: Registry,
     properties: SqlProperties,
-    orcaSqlProperties: OrcaSqlProperties
+    orcaSqlProperties: OrcaSqlProperties,
+    compressionProperties: ExecutionCompressionProperties
   ) = SqlExecutionRepository(
     orcaSqlProperties.partitionName,
     dsl,
@@ -128,7 +130,8 @@ class SqlTestConfig {
     properties.retries.transactions,
     orcaSqlProperties.batchReadSize,
     orcaSqlProperties.stageReadSize,
-    interlink = null
+    interlink = null,
+    compressionProperties = compressionProperties
   )
 
   @Bean

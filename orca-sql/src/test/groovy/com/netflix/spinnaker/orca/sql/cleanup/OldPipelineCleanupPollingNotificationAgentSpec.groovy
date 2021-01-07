@@ -20,6 +20,7 @@ import com.netflix.spinnaker.config.OldPipelineCleanupAgentConfigurationProperti
 import com.netflix.spinnaker.config.OrcaSqlProperties
 import com.netflix.spinnaker.kork.sql.config.RetryProperties
 import com.netflix.spinnaker.kork.sql.test.SqlTestUtil
+import com.netflix.spinnaker.config.ExecutionCompressionProperties
 
 import java.time.Clock
 import java.time.Instant
@@ -78,7 +79,16 @@ abstract class OldPipelineCleanupPollingNotificationAgentSpec extends Specificat
 
   def setupSpec() {
     currentDatabase = getDatabase()
-    executionRepository = new SqlExecutionRepository("test", currentDatabase.context, mapper, new RetryProperties(), 10, 100, "poolName", null, [])
+    executionRepository = new SqlExecutionRepository("test",
+        currentDatabase.context,
+        mapper,
+        new RetryProperties(),
+        10,
+        100,
+        "poolName",
+        null,
+        [],
+        new ExecutionCompressionProperties())
   }
 
   def cleanup() {

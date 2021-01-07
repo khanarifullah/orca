@@ -53,3 +53,6 @@ databaseChangeLog:
 - include:
     file: changelog/20200603-deleted-executions-table-not-mysql.yml
     relativeToChangelogFile: true
+include:
+  file: changelog/20210115-create-compressed-executions-table.yaml
+  relativeToChangelogFile: true

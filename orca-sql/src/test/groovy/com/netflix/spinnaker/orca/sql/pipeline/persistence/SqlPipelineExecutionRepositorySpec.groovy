@@ -18,8 +18,10 @@ package com.netflix.spinnaker.orca.sql.pipeline.persistence
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.netflix.spectator.api.DefaultRegistry
+import com.netflix.spinnaker.config.ExecutionCompressionProperties
 import com.netflix.spinnaker.kork.sql.config.RetryProperties
 import com.netflix.spinnaker.kork.sql.test.SqlTestUtil.TestDatabase
+import com.netflix.spinnaker.kork.telemetry.InstrumentedProxy
 import com.netflix.spinnaker.orca.api.pipeline.models.PipelineExecution
 import com.netflix.spinnaker.orca.api.pipeline.models.StageExecution
 import com.netflix.spinnaker.orca.interlink.Interlink
@@ -33,6 +35,7 @@ import com.netflix.spinnaker.orca.pipeline.model.PipelineExecutionImpl
 import com.netflix.spinnaker.orca.pipeline.model.StageExecutionImpl
 import com.netflix.spinnaker.orca.pipeline.persistence.ExecutionRepository
 import com.netflix.spinnaker.orca.pipeline.persistence.PipelineExecutionRepositoryTck
+import org.jooq.True
 import org.jooq.impl.DSL
 import rx.schedulers.Schedulers
 import de.huxhorn.sulky.ulid.ULID
@@ -93,16 +96,36 @@ abstract class SqlPipelineExecutionRepositorySpec extends PipelineExecutionRepos
     return createExecutionRepository("test")
   }
 
-  ExecutionRepository createExecutionRepository(String partition, Interlink interlink = null) {
-    return com.netflix.spinnaker.kork.telemetry.InstrumentedProxy.proxy(
+  ExecutionRepository createExecutionRepositoryWithCompression() {
+    ExecutionCompressionProperties compressionProperties = new ExecutionCompressionProperties()
+    compressionProperties.enabled = True
+    compressionProperties.bodyCompressionThreshold = 30
+    return createExecutionRepository("test", null, compressionProperties)
+  }
+
+  ExecutionRepository createExecutionRepository(
+      String partition,
+      Interlink interlink = null,
+      ExecutionCompressionProperties executionCompressionProperties = new ExecutionCompressionProperties()) {
+    return InstrumentedProxy.proxy(
         new DefaultRegistry(),
-        new SqlExecutionRepository(partition, currentDatabase.context, mapper, new RetryProperties(), 10, 100, "poolName", interlink, []),
+        new SqlExecutionRepository(partition,
+            currentDatabase.context,
+            mapper,
+            new RetryProperties(),
+            10,
+            100,
+            "poolName",
+            interlink,
+            [],
+            executionCompressionProperties),
         "namespace")
   }
 
   def "can store a new pipeline"() {
     given:
     ExecutionRepository repo = createExecutionRepository()
+
     PipelineExecution e = new PipelineExecutionImpl(PIPELINE, "myapp")
     e.stages.add(new StageExecutionImpl(e, "wait", "wait stage", [foo: 'FOO']))
 
@@ -116,6 +139,29 @@ abstract class SqlPipelineExecutionRepositorySpec extends PipelineExecutionRepos
     pipelines[0].stages.size() == 1
     pipelines[0].stages[0].id == e.stages[0].id
     pipelines[0].stages[0].context.foo == 'FOO'
+    pipelines[0].partition == 'test'
+  }
+
+  def "can store and retrieve a new pipeline with compression"() {
+    given:
+    ExecutionRepository repo = createExecutionRepositoryWithCompression()
+
+    PipelineExecution e = new PipelineExecutionImpl(PIPELINE, "myapp")
+    e.stages.add(new StageExecutionImpl(e,
+        "wait",
+        "wait stage",
+        [foo: 'string longer than compression threshold']))
+
+    when:
+    repo.store(e)
+    def pipelines = repo.retrieve(PIPELINE).toList().toBlocking().single()
+
+    then:
+    pipelines.size() == 1
+    pipelines[0].id == e.id
+    pipelines[0].stages.size() == 1
+    pipelines[0].stages[0].id == e.stages[0].id
+    pipelines[0].stages[0].context.foo == 'string longer than compression threshold'
     pipelines[0].partition == 'test'
   }
 
