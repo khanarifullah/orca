@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.orca.front50.pipeline
 
+import com.netflix.spinnaker.orca.pipeline.graph.StageGraphBuilderImpl
 import com.netflix.spinnaker.orca.pipeline.model.PipelineExecutionImpl
 import com.netflix.spinnaker.orca.pipeline.model.StageExecutionImpl
 import com.netflix.spinnaker.orca.pipeline.persistence.ExecutionRepository
@@ -52,5 +53,25 @@ class PipelineStageSpec extends Specification {
     [:]                              || false                   || false            // child pipeline has not started
     [executionId: "sub-pipeline-id"] || false                   || true            // child pipeline has started and should cancel
     [executionId: "sub-pipeline-id"] || true                    || false            // child pipeline has already been canceled
+  }
+
+  @Unroll
+  def "should suppress output if suppression enabled"() {
+    given:
+    def stage = new StageExecutionImpl(new PipelineExecutionImpl(PIPELINE, "testapp"), "pipeline", stageContext)
+    stage.setOutputs([foo: "bar"])
+    def graph = StageGraphBuilderImpl.afterStages(stage)
+
+    when:
+    pipelineStage.afterStages(stage, graph)
+
+    then:
+    assert stage.getOutputs() == expectedOutputs
+
+    where:
+    stageContext            || expectedOutputs
+    [:]                     || [foo: "bar"]
+    [suppressOutput: false] || [foo: "bar"]
+    [suppressOutput: true]  || [:]
   }
 }

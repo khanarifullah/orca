@@ -76,6 +76,9 @@ public class DeployManifestStage implements StageDefinitionBuilder {
           // do nothing
       }
     }
+
+    // Suppress stage outputs, if needed, after stage completes
+    suppressStageOutputs(stage);
   }
 
   private void disableOldManifests(Map parentContext, StageGraphBuilder graph) {
