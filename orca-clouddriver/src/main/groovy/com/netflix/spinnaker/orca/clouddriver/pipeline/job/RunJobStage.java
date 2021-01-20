@@ -84,6 +84,12 @@ public class RunJobStage implements StageDefinitionBuilder, CancellableStage {
   }
 
   @Override
+  public void onFailureStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
+    // Suppress stage outputs, if needed, after stage fails
+    suppressStageOutputs(stage);
+  }
+
+  @Override
   public Result cancel(StageExecution stage) {
     log.info(
         "Canceling run job stage {} for executionId {}",

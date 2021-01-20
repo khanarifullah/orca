@@ -68,9 +68,15 @@ public class PipelineStage implements StageDefinitionBuilder, CancellableStage {
     }
   }
 
-   @Override
+  @Override
   public void afterStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
     // Suppress stage outputs, if needed, after stage completes
+    suppressStageOutputs(stage);
+  }
+
+  @Override
+  public void onFailureStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
+    // Suppress stage outputs, if needed, after stage fails
     suppressStageOutputs(stage);
   }
 

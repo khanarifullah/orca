@@ -56,7 +56,7 @@ class PipelineStageSpec extends Specification {
   }
 
   @Unroll
-  def "should suppress output if suppression enabled"() {
+  def "should suppress output after stage if suppression enabled"() {
     given:
     def stage = new StageExecutionImpl(new PipelineExecutionImpl(PIPELINE, "testapp"), "pipeline", stageContext)
     stage.setOutputs([foo: "bar"])
@@ -64,6 +64,26 @@ class PipelineStageSpec extends Specification {
 
     when:
     pipelineStage.afterStages(stage, graph)
+
+    then:
+    assert stage.getOutputs() == expectedOutputs
+
+    where:
+    stageContext            || expectedOutputs
+    [:]                     || [foo: "bar"]
+    [suppressOutput: false] || [foo: "bar"]
+    [suppressOutput: true]  || [:]
+  }
+
+  @Unroll
+  def "should suppress after failed stage output if suppression enabled"() {
+    given:
+    def stage = new StageExecutionImpl(new PipelineExecutionImpl(PIPELINE, "testapp"), "pipeline", stageContext)
+    stage.setOutputs([foo: "bar"])
+    def graph = StageGraphBuilderImpl.afterStages(stage)
+
+    when:
+    pipelineStage.onFailureStages(stage, graph)
 
     then:
     assert stage.getOutputs() == expectedOutputs

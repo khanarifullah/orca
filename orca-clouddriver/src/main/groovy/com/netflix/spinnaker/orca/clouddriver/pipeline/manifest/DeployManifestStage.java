@@ -81,6 +81,12 @@ public class DeployManifestStage implements StageDefinitionBuilder {
     suppressStageOutputs(stage);
   }
 
+  @Override
+  public void onFailureStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
+    // Suppress stage outputs, if needed, after stage fails
+    suppressStageOutputs(stage);
+  }
+
   private void disableOldManifests(Map parentContext, StageGraphBuilder graph) {
     addStagesForOldManifests(parentContext, graph, DisableManifestStage.PIPELINE_CONFIG_TYPE);
   }

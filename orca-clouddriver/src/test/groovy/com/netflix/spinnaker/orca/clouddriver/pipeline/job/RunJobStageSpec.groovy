@@ -15,7 +15,7 @@ class RunJobStageSpec extends Specification {
   @Subject
   def runJobStage = new RunJobStage(destroyJobTask, null)
 
-  def "should suppress output if suppression enabled"() {
+  def "should suppress output after stage if suppression enabled"() {
     given:
     def stage = new StageExecutionImpl(new PipelineExecutionImpl(PIPELINE, "testapp"), "runJobManifest", stageContext)
     stage.setOutputs([foo: "bar"])
@@ -23,6 +23,25 @@ class RunJobStageSpec extends Specification {
 
     when:
     runJobStage.afterStages(stage, graph)
+
+    then:
+    assert stage.getOutputs() == expectedOutputs
+
+    where:
+    stageContext            || expectedOutputs
+    [:]                     || [foo: "bar"]
+    [suppressOutput: false] || [foo: "bar"]
+    [suppressOutput: true]  || [:]
+  }
+
+  def "should suppress after failed stage output if suppression enabled"() {
+    given:
+    def stage = new StageExecutionImpl(new PipelineExecutionImpl(PIPELINE, "testapp"), "runJobManifest", stageContext)
+    stage.setOutputs([foo: "bar"])
+    def graph = StageGraphBuilderImpl.afterStages(stage)
+
+    when:
+    runJobStage.onFailureStages(stage, graph)
 
     then:
     assert stage.getOutputs() == expectedOutputs
