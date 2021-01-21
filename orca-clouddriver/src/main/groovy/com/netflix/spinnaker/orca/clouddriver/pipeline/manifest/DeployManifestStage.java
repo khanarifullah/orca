@@ -80,6 +80,14 @@ public class DeployManifestStage implements StageDefinitionBuilder {
           // do nothing
       }
     }
+    // Suppress stage outputs, if needed, after stage completes
+    suppressStageOutputs(stage);
+  }
+
+  @Override
+  public void onFailureStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
+    // Suppress stage outputs, if needed, after stage fails
+    suppressStageOutputs(stage);
   }
 
   private void disableOldManifests(Map<String, Object> parentContext, StageGraphBuilder graph) {

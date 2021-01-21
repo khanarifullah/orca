@@ -21,6 +21,7 @@ import static java.util.Collections.emptyMap;
 
 import com.netflix.spinnaker.orca.api.pipeline.CancellableStage;
 import com.netflix.spinnaker.orca.api.pipeline.graph.StageDefinitionBuilder;
+import com.netflix.spinnaker.orca.api.pipeline.graph.StageGraphBuilder;
 import com.netflix.spinnaker.orca.api.pipeline.graph.TaskNode;
 import com.netflix.spinnaker.orca.api.pipeline.models.PipelineExecution;
 import com.netflix.spinnaker.orca.api.pipeline.models.StageExecution;
@@ -72,6 +73,18 @@ public class PipelineStage implements StageDefinitionBuilder, CancellableStage {
   }
 
   @Override
+  public void afterStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
+    // Suppress stage outputs, if needed, after stage completes
+    suppressStageOutputs(stage);
+  }
+
+  @Override
+  public void onFailureStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
+    // Suppress stage outputs, if needed, after stage fails
+    suppressStageOutputs(stage);
+  }
+
+  @Override
   public void prepareStageForRestart(@Nonnull StageExecution stage) {
     StageContext context = (StageContext) stage.getContext();
 
@@ -117,6 +130,9 @@ public class PipelineStage implements StageDefinitionBuilder, CancellableStage {
       log.error(
           format("Failed to cancel stage %s, e: %s", readableStageDetails, e.getMessage()), e);
     }
+
+    // Suppress stage outputs, if needed, after stage is cancelled
+    suppressStageOutputs(stage);
 
     return new CancellableStage.Result(stage, emptyMap());
   }

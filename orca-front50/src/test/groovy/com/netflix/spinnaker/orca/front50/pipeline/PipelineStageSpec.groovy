@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.orca.front50.pipeline
 
+import com.netflix.spinnaker.orca.pipeline.graph.StageGraphBuilderImpl
 import com.netflix.spinnaker.orca.pipeline.model.PipelineExecutionImpl
 import com.netflix.spinnaker.orca.pipeline.model.StageExecutionImpl
 import com.netflix.spinnaker.orca.pipeline.persistence.ExecutionRepository
@@ -71,5 +72,64 @@ class PipelineStageSpec extends Specification {
         [:]                || false
         [skippable: true]  || true
         [skippable: false] || false
+    }
+
+    @Unroll
+    def "should suppress output after stage if suppression enabled"() {
+        given:
+        def stage = new StageExecutionImpl(new PipelineExecutionImpl(PIPELINE, "testapp"), "pipeline", stageContext)
+        stage.setOutputs([foo: "bar"])
+        def graph = StageGraphBuilderImpl.afterStages(stage)
+
+        when:
+        pipelineStage.afterStages(stage, graph)
+
+        then:
+        assert stage.getOutputs() == expectedOutputs
+
+        where:
+        stageContext            || expectedOutputs
+        [:]                     || [foo: "bar"]
+        [suppressOutput: false] || [foo: "bar"]
+        [suppressOutput: true]  || [:]
+    }
+
+    @Unroll
+    def "should suppress after failed stage output if suppression enabled"() {
+        given:
+        def stage = new StageExecutionImpl(new PipelineExecutionImpl(PIPELINE, "testapp"), "pipeline", stageContext)
+        stage.setOutputs([foo: "bar"])
+        def graph = StageGraphBuilderImpl.afterStages(stage)
+
+        when:
+        pipelineStage.onFailureStages(stage, graph)
+
+        then:
+        assert stage.getOutputs() == expectedOutputs
+
+        where:
+        stageContext            || expectedOutputs
+        [:]                     || [foo: "bar"]
+        [suppressOutput: false] || [foo: "bar"]
+        [suppressOutput: true]  || [:]
+    }
+
+    @Unroll
+    def "should suppress output after stage cancelled, if suppression enabled"() {
+        given:
+        def stage = new StageExecutionImpl(new PipelineExecutionImpl(PIPELINE, "testapp"), "pipeline", stageContext)
+        stage.setOutputs([foo: "bar"])
+
+        when:
+        pipelineStage.cancel(stage)
+
+        then:
+        assert stage.getOutputs() == expectedOutputs
+
+        where:
+        stageContext            || expectedOutputs
+        [:]                     || [foo: "bar"]
+        [suppressOutput: false] || [foo: "bar"]
+        [suppressOutput: true]  || [:]
     }
 }

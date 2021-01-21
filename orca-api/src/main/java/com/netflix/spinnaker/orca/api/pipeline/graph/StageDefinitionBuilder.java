@@ -18,6 +18,7 @@ package com.netflix.spinnaker.orca.api.pipeline.graph;
 
 import static com.netflix.spinnaker.orca.api.pipeline.graph.TaskNode.Builder;
 import static com.netflix.spinnaker.orca.api.pipeline.graph.TaskNode.GraphType.FULL;
+import static java.util.Collections.emptyMap;
 
 import com.netflix.spinnaker.kork.annotations.Beta;
 import com.netflix.spinnaker.kork.plugins.api.internal.SpinnakerExtensionPoint;
@@ -122,6 +123,19 @@ public interface StageDefinitionBuilder extends SpinnakerExtensionPoint {
   /** Return true if the stage can be manually skipped from the API. */
   default boolean canManuallySkip(StageExecution stage) {
     return false;
+  }
+
+  /**
+   * Suppresses outputs in the stage's context if suppression is enabled in the stage's
+   * configuration
+   *
+   * @param stage {@link StageExecution} to suppress the output in
+   */
+  default void suppressStageOutputs(StageExecution stage) {
+    if ((Boolean) stage.getContext().getOrDefault("suppressOutput", false)) {
+      // Supress stage's outputs if suppressOutput is set to true
+      stage.setOutputs(emptyMap());
+    }
   }
 
   /** A collection of known aliases. */

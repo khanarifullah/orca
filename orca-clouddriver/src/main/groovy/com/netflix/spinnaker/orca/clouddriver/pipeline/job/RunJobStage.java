@@ -19,6 +19,7 @@ package com.netflix.spinnaker.orca.clouddriver.pipeline.job;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.netflix.spinnaker.orca.api.pipeline.CancellableStage;
 import com.netflix.spinnaker.orca.api.pipeline.graph.StageDefinitionBuilder;
+import com.netflix.spinnaker.orca.api.pipeline.graph.StageGraphBuilder;
 import com.netflix.spinnaker.orca.api.pipeline.graph.TaskNode;
 import com.netflix.spinnaker.orca.api.pipeline.models.StageExecution;
 import com.netflix.spinnaker.orca.clouddriver.tasks.artifacts.ConsumeArtifactTask;
@@ -77,6 +78,18 @@ public class RunJobStage implements StageDefinitionBuilder, CancellableStage {
   }
 
   @Override
+  public void afterStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
+    // Suppress stage outputs, if needed, after stage completes
+    suppressStageOutputs(stage);
+  }
+
+  @Override
+  public void onFailureStages(@Nonnull StageExecution stage, @Nonnull StageGraphBuilder graph) {
+    // Suppress stage outputs, if needed, after stage fails
+    suppressStageOutputs(stage);
+  }
+
+  @Override
   public Result cancel(StageExecution stage) {
     log.info(
         "Canceling run job stage {} for executionId {}",
@@ -108,6 +121,9 @@ public class RunJobStage implements StageDefinitionBuilder, CancellableStage {
               stage.getId(), stage.getExecution().getId(), e.getMessage()),
           e);
     }
+
+    // Suppress stage outputs, if needed, after stage is cancelled
+    suppressStageOutputs(stage);
 
     return new Result(stage, destroyContext);
   }
