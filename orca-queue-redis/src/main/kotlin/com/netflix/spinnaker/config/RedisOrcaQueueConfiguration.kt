@@ -33,6 +33,7 @@ import com.netflix.spinnaker.q.redis.RedisDeadMessageHandler
 import com.netflix.spinnaker.q.redis.RedisQueue
 import java.time.Clock
 import java.util.Optional
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -45,12 +46,21 @@ import redis.clients.jedis.JedisCluster
 import redis.clients.jedis.util.Pool
 
 @Configuration
-@EnableConfigurationProperties(ObjectMapperSubtypeProperties::class)
+@EnableConfigurationProperties(ObjectMapperSubtypeProperties::class, RedisQueueProperties::class)
 @ConditionalOnProperty(
   value = ["keiko.queue.redis.enabled"],
   havingValue = "true",
   matchIfMissing = true)
 class RedisOrcaQueueConfiguration : RedisQueueConfiguration() {
+
+  @Bean
+  override fun redisPoolConfig() = GenericObjectPoolConfig<Any>().apply {
+    blockWhenExhausted = true
+    maxWaitMillis = -1
+    maxIdle = 100
+    maxTotal = 100
+    minIdle = 50
+  }
 
   @Autowired
   fun redisQueueObjectMapper(
