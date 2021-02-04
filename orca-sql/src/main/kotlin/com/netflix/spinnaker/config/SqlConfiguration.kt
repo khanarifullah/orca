@@ -45,7 +45,7 @@ import org.springframework.context.annotation.Primary
 
 @Configuration
 @ConditionalOnProperty("sql.enabled")
-@EnableConfigurationProperties(OrcaSqlProperties::class)
+@EnableConfigurationProperties(OrcaSqlProperties::class, ExecutionCompressionProperties::class)
 @Import(DefaultSqlConfiguration::class)
 @ComponentScan("com.netflix.spinnaker.orca.sql")
 
@@ -62,7 +62,8 @@ class SqlConfiguration {
     registry: Registry,
     properties: SqlProperties,
     orcaSqlProperties: OrcaSqlProperties,
-    interlink: Optional<Interlink>
+    interlink: Optional<Interlink>,
+    compressionProperties: ExecutionCompressionProperties
   ) =
     SqlExecutionRepository(
       orcaSqlProperties.partitionName,
@@ -72,8 +73,7 @@ class SqlConfiguration {
       orcaSqlProperties.batchReadSize,
       orcaSqlProperties.stageReadSize,
       interlink = interlink.orElse(null),
-      enableBodyCompression = orcaSqlProperties.enableBodyCompression,
-      bodyCompressionThreshold = orcaSqlProperties.bodyCompressionThreshold
+      compressionProperties = compressionProperties
     ).let {
       InstrumentedProxy.proxy(registry, it, "sql.executions", mapOf(Pair("repository", "primary"))) as ExecutionRepository
     }
@@ -86,7 +86,8 @@ class SqlConfiguration {
     registry: Registry,
     properties: SqlProperties,
     orcaSqlProperties: OrcaSqlProperties,
-    @Value("\${execution-repository.sql.secondary.pool-name}") poolName: String
+    @Value("\${execution-repository.sql.secondary.pool-name}") poolName: String,
+    compressionProperties: ExecutionCompressionProperties
   ) =
     SqlExecutionRepository(
       orcaSqlProperties.partitionName,
@@ -96,8 +97,7 @@ class SqlConfiguration {
       orcaSqlProperties.batchReadSize,
       orcaSqlProperties.stageReadSize,
       poolName,
-      enableBodyCompression = orcaSqlProperties.enableBodyCompression,
-      bodyCompressionThreshold = orcaSqlProperties.bodyCompressionThreshold
+      compressionProperties = compressionProperties
     ).let {
       InstrumentedProxy.proxy(registry, it, "sql.executions", mapOf(Pair("repository", "secondary"))) as ExecutionRepository
     }

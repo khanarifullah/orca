@@ -17,13 +17,14 @@ package com.netflix.spinnaker.orca.sql.pipeline.persistence
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.google.common.annotations.VisibleForTesting
+import com.netflix.spinnaker.config.CompressionType
 import com.netflix.spinnaker.orca.api.pipeline.models.PipelineExecution
 import com.netflix.spinnaker.orca.api.pipeline.models.StageExecution
 import java.sql.ResultSet
 import org.jooq.DSLContext
 import org.slf4j.LoggerFactory
 import java.nio.charset.StandardCharsets
-import java.util.zip.GZIPInputStream
 
 /**
  * Converts a SQL [ResultSet] into an Execution.
@@ -38,16 +39,25 @@ class ExecutionMapper(
 
   private val log = LoggerFactory.getLogger(javaClass)
 
-  fun conditionallyDecompressBody(
-    body: String,
-    compressedBody: ByteArray?
-  ): String {
-    return if (compressedBody == null) {
-      body
-    } else {
-      GZIPInputStream(compressedBody.inputStream())
+  /**
+   * Conditionally decompresses a compressed execution body. if present, and provides the
+   * execution body content as a string
+   *
+   * @param rs [ResultSet] to pull the body from
+   *
+   * @return the decompressed execution body content
+   */
+  @VisibleForTesting
+  fun getDecompressedBody(rs: ResultSet): String {
+    val body = rs.getString("body")
+    return if (body.isNullOrEmpty()) {
+      val compressionType = CompressionType.valueOf(rs.getString("compression_type"))
+      val compressedBody = rs.getBytes("compressed_body")
+      compressionType.getInflator(compressedBody.inputStream())
         .bufferedReader(StandardCharsets.UTF_8)
         .use { it.readText() }
+    } else {
+      body
     }
   }
 
@@ -57,12 +67,11 @@ class ExecutionMapper(
     val legacyMap = mutableMapOf<String, String>()
 
     while (rs.next()) {
-      mapper.readValue<PipelineExecution>(
-          conditionallyDecompressBody(rs.getString("body"), rs.getBytes("compressed_body"))
-      )
+      mapper.readValue<PipelineExecution>(getDecompressedBody(rs))
         .also {
-          execution -> results.add(execution)
-          execution.partition = rs.getString("`partition`")
+            execution ->
+          results.add(execution)
+          execution.partition = rs.getString("partition")
 
           if (rs.getString("id") != execution.id) {
             // Map legacyId executions to their current ULID
@@ -106,9 +115,7 @@ class ExecutionMapper(
     executions.getValue(executionId)
       .stages
       .add(
-        mapper.readValue<StageExecution>(
-            conditionallyDecompressBody(rs.getString("body"), rs.getBytes("compressed_body"))
-          )
+        mapper.readValue<StageExecution>(getDecompressedBody(rs))
           .apply {
             execution = executions.getValue(executionId)
           }

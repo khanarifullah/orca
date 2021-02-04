@@ -20,18 +20,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 /**
  * @param partitionName Multi-region partitioning; unused presently
  * @param batchReadSize Defines the internal page size for large select scans
- * @param enableExecutionBodyCompression Enables execution body compression
- *                                       for bodies larger than maxExecutionBodySize
- * @param maxExecutionBodySize Defines the maximum size of the execution body, in bytes,
- *                             beyond which the body will be compressed
  */
 @ConfigurationProperties("sql")
 class OrcaSqlProperties {
   var partitionName: String? = null
   var batchReadSize: Int = 10
   var stageReadSize: Int = 200
-
-  // Pipeline/Stage execution body size configs
-  var enableBodyCompression: Boolean = false
-  var bodyCompressionThreshold: Int = 1024
 }
